@@ -3,6 +3,7 @@ package com.expensemanager.service;
 import com.expensemanager.dto.UserRegistrationDto;
 import com.expensemanager.dto.UserViewDto;
 import com.expensemanager.entity.User;
+import com.expensemanager.exception.UserAlreadyExistsException; // Added import
 import com.expensemanager.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,10 +27,10 @@ public class UserService {
     @Transactional
     public UserViewDto registerUser(UserRegistrationDto registrationDto) {
         if (userRepository.existsByUsername(registrationDto.getUsername())) {
-            throw new IllegalArgumentException("Username already exists"); // Or a custom exception
+            throw new UserAlreadyExistsException("Username already exists: " + registrationDto.getUsername());
         }
         if (userRepository.existsByEmail(registrationDto.getEmail())) {
-            throw new IllegalArgumentException("Email already exists"); // Or a custom exception
+            throw new UserAlreadyExistsException("Email already exists: " + registrationDto.getEmail());
         }
 
         User user = new User();
