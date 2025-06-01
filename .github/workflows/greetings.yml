@@ -5,7 +5,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '30 1 * * *'  # 07:00 IST = 01:30 UTC
+    - cron: '0 */6 * * *'   # Every 6 hours (4 times per day)
   workflow_dispatch:      # optional: manual trigger
 
 jobs:
@@ -21,12 +21,79 @@ jobs:
           git config --global user.name 'Vikas'
           git config --global user.email 'vikasjaiswal794@gmail.com'
 
-      - name: Append IST date to README
+      - name: Check if should run this time (random with daily limit)
+        id: decide
         run: |
-          echo "Last updated: $(date +"%Y-%m-%d %H:%M:%S IST" --date='5 hours 30 minutes')" >> README.md
+          # File to track today's runs
+          RUNS_FILE=".runs_today"
+
+          # Get today's date
+          TODAY=$(date +%Y-%m-%d)
+
+          # Get current hour
+          HOUR=$(date +%H)
+
+          # Max runs per day
+          MAX_RUNS=4
+
+          # Probability to run this time (e.g., 50%)
+          PROB=0.5
+
+          # Initialize the runs file if not exists or date changed
+          if [ ! -f "$RUNS_FILE" ] || ! grep -q "$TODAY" "$RUNS_FILE"; then
+            echo "$TODAY 0" > "$RUNS_FILE"
+          fi
+
+          # Read current count
+          COUNT=$(cut -d' ' -f2 "$RUNS_FILE")
+
+          # If max runs reached, skip
+          if [ "$COUNT" -ge "$MAX_RUNS" ]; then
+            echo "max_runs_reached=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Force at least one run per day at 7am IST (1:30 UTC)
+          FORCE_RUN_HOUR=1
+
+          if [ "$HOUR" -eq "$FORCE_RUN_HOUR" ] && [ "$COUNT" -eq 0 ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "force_run=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Random check
+          RAND=$(awk -v seed=$RANDOM 'BEGIN { srand(seed); print rand() }')
+
+          if (( $(echo "$RAND < $PROB" | bc -l) )); then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Skip if not running this time
+        if: steps.decide.outputs.should_run != 'true'
+        run: echo "Skipping this run."
+
+      - name: Update README with IST timestamp
+        if: steps.decide.outputs.should_run == 'true'
+        run: |
+          # Remove existing 'Last updated:' lines
+          sed -i '/^Last updated:/d' README.md
+
+          # Append new line at the end
+          echo -e "\nLast updated: $(date +"%Y-%m-%d %H:%M:%S IST" --date='5 hours 30 minutes')" >> README.md
+
+          # Update run count
+          TODAY=$(date +%Y-%m-%d)
+          RUNS_FILE=".runs_today"
+          COUNT=$(cut -d' ' -f2 "$RUNS_FILE")
+          NEW_COUNT=$((COUNT + 1))
+          sed -i "s/$TODAY .*/$TODAY $NEW_COUNT/" "$RUNS_FILE"
 
       - name: Commit and push changes
+        if: steps.decide.outputs.should_run == 'true'
         run: |
           git add README.md
-          git commit -m "Daily update: $(date --date='5 hours 30 minutes' +'%Y-%m-%d')" || echo "No changes to commit"
+          git commit -m "Daily update: $(date --date='5 hours 30 minutes' +'%Y-%m-%d %H:%M:%S IST')" || echo "No changes to commit"
           git push origin main
