@@ -92,8 +92,9 @@ jobs:
           sed -i "s/$TODAY .*/$TODAY $NEW_COUNT/" "$RUNS_FILE"
 
       - name: Commit and push changes
-        if: steps.decide.outputs.should_run == 'true'
+        if: success() && steps.decide.outputs.should_run == 'true'
         run: |
           git add README.md
-          git commit -m "Daily update: $(date --date='5 hours 30 minutes' +'%Y-%m-%d %H:%M:%S IST')" || echo "No changes to commit"
+          git commit -m "Daily update: $(date '+%Y-%m-%d %H:%M:%S %Z')" || echo "No changes to commit"
+          git pull --rebase origin main
           git push origin main
