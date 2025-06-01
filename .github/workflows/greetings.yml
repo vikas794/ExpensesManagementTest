@@ -1,0 +1,29 @@
+name: Daily IST README Update
+
+on:
+  schedule:
+    - cron: '30 1 * * *'  # 07:00 IST = 01:30 UTC
+  workflow_dispatch:      # optional: manual trigger
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config --global user.name 'Vikas'
+          git config --global user.email 'vikasjaiswal794@gmail.com'
+
+      - name: Append IST date to README
+        run: |
+          echo "Last updated: $(date +"%Y-%m-%d %H:%M:%S IST" --date='5 hours 30 minutes')" >> README.md
+
+      - name: Commit and push changes
+        run: |
+          git add README.md
+          git commit -m "Daily update: $(date --date='5 hours 30 minutes' +'%Y-%m-%d')" || echo "No changes to commit"
+          git push origin main
